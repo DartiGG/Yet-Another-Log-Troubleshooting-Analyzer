@@ -9,6 +9,7 @@ AI-powered local log analyzer for Windows, Linux and Mac.
 Future plans
 
 Before the end of August I will add syslog to this project and reduce false-positive results.
+
 ---
 
 ## RU
@@ -20,4 +21,5 @@ Before the end of August I will add syslog to this project and reduce false-posi
 Планы на будущее
 
 До конца августа планируется добавления поддержки syslog и уменьшение false-positive результатов.
+
 ---
