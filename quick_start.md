@@ -6,8 +6,16 @@
 
 **n8n**
 1. Import `YAITSA.json` into n8n.
-2. Enter the model details and credentials (API Key for LM Studio can be any placeholder string).
+2. Enter the model details and credentials (API Key for LM Studio can be any placeholder string) in "send to AI" block.
 
+**cmd/powershell**
+.\yalta. -FilePath "C:\path\to\your.log" -Type "ssh"
+Available types: ssh | nginx | journalctl
+
+**Bash**
+  chmod +x yalta.sh
+  ./yalta.sh -f /path/to/your.log -t ssh
+  Available types: ssh | nginx | journalct
 ---
 
 ### RU
@@ -18,4 +26,13 @@
 
 **n8n**
 1. Импортируйте файл `YAITSA.json` в n8n.
-2. Укажите данные подключения (в качестве API Key для LM Studio можно вписать любой случайный набор символов)
+2. Укажите данные подключения (в качестве API Key для LM Studio можно вписать любой случайный набор символов) в блоке "Send to AI"
+
+**cmd/powershell**
+.\yalta.ps1 -FilePath "C:\path\to\your.log" -Type "ssh"
+Доступные сервисы: ssh | nginx | journalctl
+
+**Bash**
+  chmod +x yalta.sh
+  ./yalta.sh -f /path/to/your.log -t ssh
+  Доступные сервисы: ssh | nginx | journalctl
