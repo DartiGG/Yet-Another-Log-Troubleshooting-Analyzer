@@ -1,0 +1,366 @@
+{
+  "name": "YALTA",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "// 1. Проверяем наличие бинарных данных\nconst binaryData = $input.item.binary;\nif (!binaryData || !binaryData.file || !binaryData.rules) {\n  throw new Error(\"Missing 'file' or 'rules' parameter in request.\");\n}\n\n// 2. Читаем файл логов\nconst logBuffer = await this.helpers.getBinaryDataBuffer(0, 'file');\nconst logText = logBuffer.toString('utf-8');\n\n// 3. Читаем файл правил (rules.json)\nconst rulesBuffer = await this.helpers.getBinaryDataBuffer(0, 'rules');\nconst rulesJson = JSON.parse(rulesBuffer.toString('utf-8'));\n\n// 4. Получаем тип лога\nconst body = $('Webhook').item.json.body || {};\nconst logType = body.type || 'ssh';\n\n// 5. Разбиваем лог на строки\nconst lines = logText.split(/\\r?\\n/).filter(line => line.trim() !== '');\n\nif (lines.length === 0) {\n  return [{ json: { log_line: '', type: logType, rules: rulesJson, is_empty: true } }];\n}\n\n// 6. Передаем в следующий узел строку лога, тип и САМИ ПРАВИЛА\nreturn lines.map(line => ({\n  json: {\n    log_line: line,\n    type: logType,\n    rules: rulesJson // Пробрасываем правила как JSON-объект каждому элементу\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        96
+      ],
+      "id": "3e9fdb6e-e563-44bc-be86-e91b6f19315b",
+      "name": "reading file"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.18.0.1:1234/v1/chat/completions",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"ibm/granite-3.1-8b\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are an SOC analyst. Assess whether this activity is suspicious. Just write down your assessment and a list of issues (specifying the relevant lines); do not try to engage in a conversation.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Analyze log: {{ $json.log_line }}\"\n    }\n  ],\n  \"temperature\": 0.2\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2352,
+        0
+      ],
+      "id": "3d6a9b26-bf36-402e-9f0e-90b7817b627f",
+      "name": "send to AI",
+      "executeOnce": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "analyze",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        464,
+        96
+      ],
+      "id": "ec0c2f06-03d3-4f08-94ab-396a735ca875",
+      "name": "Webhook",
+      "webhookId": "c0e76e80-3fa3-4830-8348-de35a7505be3"
+    },
+    {
+      "parameters": {
+        "jsCode": "const inputItem = $json || {};\nconst logType = inputItem.type || 'ssh';\nconst logLine = inputItem.log_line || '';\nconst rulesJson = inputItem.rules || {}; // Правила уже здесь!\n\nconst patterns = rulesJson[logType] || [];\nconst flags = logType === 'journalctl' ? 'i' : '';\n\nconst matchedPattern = patterns.find(pattern => {\n  try {\n    return new RegExp(pattern, flags).test(logLine);\n  } catch (e) {\n    return false;\n  }\n});\n\nreturn {\n  json: {\n    log_line: logLine,\n    log_type: logType,\n    is_suspicious: Boolean(matchedPattern),\n    matched_rule: matchedPattern || null\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1264,
+        96
+      ],
+      "id": "31da0b51-b91a-4ed6-a6aa-122dd98e8aae",
+      "name": "Interpretate rules"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "767d7f12-c5fc-46ef-85cf-55aaca478a04",
+              "leftValue": "={{ $json.is_suspicious }}",
+              "rightValue": "is_suspicious == true",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1456,
+        128
+      ],
+      "id": "b38953b0-92b7-4f1e-b94d-a0991a9658a3",
+      "name": "is suspicious?"
+    },
+    {
+      "parameters": {
+        "url": "http://172.18.0.1:1234/v1/models",
+        "options": {
+          "timeout": 2000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1808,
+        32
+      ],
+      "id": "e9b94462-180e-409a-84f6-ade0a572e2ee",
+      "name": "Ping AI",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "0e07cebc-4991-4fe2-b859-9b6461fbc4e7",
+              "leftValue": "={{ $json.error.message }}",
+              "rightValue": "=timeout of 2000ms exceeded",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1984,
+        0
+      ],
+      "id": "ca773889-a5b0-4765-b7d9-e489cb0449b8",
+      "name": "model online"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "=={{ $json.choices[0].message.content }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/plain; charset=utf-8"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2544,
+        -80
+      ],
+      "id": "03a81bff-64d6-4499-a0a7-afaa9f413fcd",
+      "name": "AI response"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "=***No model detected. Using non-AI mode***\n{{ $('Interpretate rules').item.json.log_line}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2608,
+        384
+      ],
+      "id": "7937dd48-77ba-41cf-88a6-e8f45428fb5d",
+      "name": "Non AI response"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "No problems detected",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1680,
+        544
+      ],
+      "id": "db49d55f-82e8-494c-8b24-aaed423735c1",
+      "name": "No problems"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "3988d2e7-5d36-43cf-9b5e-6a023782d3ee",
+              "leftValue": "",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1616,
+        128
+      ],
+      "id": "b3bb7022-de2d-43f3-878b-ea90978dea9c",
+      "name": "REALLY SUSPICIOUS?"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "reading file": {
+      "main": [
+        [
+          {
+            "node": "Interpretate rules",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send to AI": {
+      "main": [
+        [
+          {
+            "node": "AI response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "reading file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Interpretate rules": {
+      "main": [
+        [
+          {
+            "node": "is suspicious?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "is suspicious?": {
+      "main": [
+        [
+          {
+            "node": "REALLY SUSPICIOUS?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No problems",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ping AI": {
+      "main": [
+        [
+          {
+            "node": "model online",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "model online": {
+      "main": [
+        [
+          {
+            "node": "send to AI",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Non AI response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "REALLY SUSPICIOUS?": {
+      "main": [
+        [
+          {
+            "node": "Ping AI",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Non AI response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "db4e5ad7-3258-4dac-8c6b-ed2ec527b126",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "8e725737db36fb0920a0fd1860adff6ad8bded1e9950911f0075d77dfd7d8510"
+  },
+  "nodeGroups": [],
+  "id": "0ggSKSGJZvqg9vSj",
+  "tags": []
+}
