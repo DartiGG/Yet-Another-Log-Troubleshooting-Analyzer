@@ -3,7 +3,7 @@
 
 AI-powered local log analyzer for Windows, Linux and Mac.
 ## Actual workflow
-<img width="1477" height="569" alt="изображение" src="https://github.com/user-attachments/assets/cc082b8b-b350-4ddf-a92a-a1244cd7ddc6" />
+<img width="1616" height="611" alt="изображение" src="https://github.com/user-attachments/assets/87df8cd7-53b9-409f-972f-36323bcd7c3d" />
 
 
 Future plans
@@ -16,7 +16,7 @@ Before the end of August I will add syslog to this project and reduce false-posi
 
 ЯЛТА - ИИ локальный анализатор логов для Windows, Linux и Mac.
 ## Актуальный воркфлоу
-<img width="1477" height="569" alt="изображение" src="https://github.com/user-attachments/assets/de8fb404-e329-4327-96d0-f3b6a945b3f0" />
+<img width="1616" height="611" alt="изображение" src="https://github.com/user-attachments/assets/226d168d-a72d-43dc-8079-1d960c97812f" />
 
 Планы на будущее
 
