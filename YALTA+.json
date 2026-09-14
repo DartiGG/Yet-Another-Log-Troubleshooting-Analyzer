@@ -1,0 +1,364 @@
+{
+  "name": "YALTA",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "// 1. Извлекаем массив всех входящих элементов\nconst items = $input.all();\nif (!items || items.length === 0) {\n  return [];\n}\n\nconst item = items[0];\nconst binaryData = item.binary;\n\n// Проверяем наличие бинарных файлов\nif (!binaryData || !binaryData.file || !binaryData.rules) {\n  throw new Error(\"Missing 'file' or 'rules' binary parameter in request.\");\n}\n\n// 2. Читаем бинарные данные по имени ключа\nconst logBuffer = await this.helpers.getBinaryDataBuffer(0, 'file');\nconst logText = logBuffer.toString('utf-8');\n\nconst rulesBuffer = await this.helpers.getBinaryDataBuffer(0, 'rules');\nconst rulesJson = JSON.parse(rulesBuffer.toString('utf-8'));\n\n// 3. Извлекаем log_type с защитой от сдвига аргументов\nconst body = $('Webhook').item?.json?.body || {};\nlet logType = body.type || 'ssh';\n\nif (!logType || typeof logType !== 'string' || logType.endsWith('.json')) {\n  logType = 'ssh';\n}\n\n// 4. Разбиваем лог на строки\nconst lines = logText.split(/\\r?\\n/).filter(line => line.trim() !== '');\n\nif (lines.length === 0) {\n  return [\n    {\n      json: {\n        log_line: '',\n        type: logType,\n        rules: rulesJson,\n        is_empty: true\n      }\n    }\n  ];\n}\n\n// 5. Возвращаем обычный массив объектов { json: ... }\nconst output = lines.map(line => ({\n  json: {\n    log_line: line,\n    type: logType,\n    rules: rulesJson\n  }\n}));\n\nreturn [\n  {\n    json: {\n      log_line: logText,\n      type: logType,\n      rules: rulesJson\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1504,
+        176
+      ],
+      "id": "a7da7dad-ef2b-4258-bc6a-307ae8a5c35a",
+      "name": "reading file"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://10.73.224.168:1234/v1/chat/completions",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "=={{\n  {\n    model: \"google/gemma-4-e4b\",\n    messages: [\n      {\n        role: \"system\",\n        content: \"You are an SOC analyst. Assess whether this activity is suspicious. Just write down your assessment and a list of issues (specifying the relevant lines); do not try to engage in a conversation.\"\n      },\n      {\n        role: \"user\",\n        content: \"Analyze log:\\n\" + $('reading file').item.json.log_line\n      }\n    ],\n    temperature: 0.2\n  }\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -192,
+        80
+      ],
+      "id": "1ae85eb4-ccd7-489c-acf3-55ef4cddefe5",
+      "name": "send to AI",
+      "executeOnce": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "analyze",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -2080,
+        176
+      ],
+      "id": "192a82ac-6a09-49eb-b499-1b24c32570e0",
+      "name": "Webhook",
+      "webhookId": "c0e76e80-3fa3-4830-8348-de35a7505be3"
+    },
+    {
+      "parameters": {
+        "jsCode": "const inputItem = $json || {};\n\nconst logType = String(inputItem.type || 'ssh').toLowerCase();\nconst logLine = String(inputItem.log_line || '');\n\nlet rulesJson = inputItem.rules || {};\n\nif (typeof rulesJson === 'string') {\n  try {\n    rulesJson = JSON.parse(rulesJson);\n  } catch (e) {\n    console.error('Ошибка парсинга rules:', e.message);\n    rulesJson = {};\n  }\n}\n\nconst patternsL1 = rulesJson[logType]?.level_1 || [];\nconst patternsL2 = rulesJson[logType]?.level_2 || [];\n\nconst checkRules = (patterns, level) => {\n  const matches = [];\n\n  if (!Array.isArray(patterns)) return matches;\n\n  for (const pattern of patterns) {\n    try {\n      const flags = logType === 'journalctl' ? 'gi' : 'g';\n      const regex = new RegExp(pattern, flags);\n\n      let match;\n      while ((match = regex.exec(logLine)) !== null) {\n        matches.push({\n          level,\n          rule: pattern,\n          matched_text: match[0],\n        });\n\n        // Защита от бесконечного цикла для некоторых regex\n        if (match[0] === '') {\n          regex.lastIndex++;\n        }\n      }\n    } catch (e) {\n      console.error(`Ошибка обработки правила ${pattern}: ${e.message}`);\n    }\n  }\n\n  return matches;\n};\n\nconst level1Matches = checkRules(patternsL1, 1);\nconst level2Matches = checkRules(patternsL2, 2);\n\nreturn {\n  json: {\n    log_line: logLine,\n    log_type: logType,\n    patterns_l1: patternsL1,\n    patterns_l2: patternsL2,\n    is_suspicious: level1Matches.length > 0,\n    is_really_suspicious: level2Matches.length > 0,\n    matched_rules: [...level1Matches, ...level2Matches],\n  }\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1280,
+        176
+      ],
+      "id": "ca58e6e1-c959-416b-8e04-56113d29c7e9",
+      "name": "Interpretate rules"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "767d7f12-c5fc-46ef-85cf-55aaca478a04",
+              "leftValue": "={{ $json.is_suspicious }}",
+              "rightValue": "is_suspicious == true",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1088,
+        208
+      ],
+      "id": "f4f248b6-f10d-4a57-8d8e-ff683ec2ab3c",
+      "name": "is suspicious?"
+    },
+    {
+      "parameters": {
+        "url": "http://10.73.224.168:1234/v1/models",
+        "options": {
+          "timeout": 2000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -736,
+        112
+      ],
+      "id": "b174ff10-9936-44ac-b28b-8d13a36024da",
+      "name": "Ping AI",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "0e07cebc-4991-4fe2-b859-9b6461fbc4e7",
+              "leftValue": "={{ $json.error.message }}",
+              "rightValue": "=timeout of 2000ms exceeded",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -560,
+        80
+      ],
+      "id": "fe2a6fc1-e799-4688-91be-3113253f30b0",
+      "name": "model online"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "=={{ $json.choices[0].message.content }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/plain; charset=utf-8"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        0,
+        0
+      ],
+      "id": "8ad18a35-d1a0-44e8-94f5-3693a34dc3c0",
+      "name": "AI response"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "=***No model detected. Using non-AI mode***\n{{ $('Interpretate rules').item.json.log_line}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        64,
+        464
+      ],
+      "id": "a62091b8-7df2-4b12-b868-353e9fb6124a",
+      "name": "Non AI response"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "No problems detected",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        -864,
+        624
+      ],
+      "id": "a8a7268b-982b-49c7-9081-d05d49422663",
+      "name": "No problems"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "3988d2e7-5d36-43cf-9b5e-6a023782d3ee",
+              "leftValue": "={{ $('Interpretate rules').item.json.is_really_suspicious }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -928,
+        208
+      ],
+      "id": "91af6c17-4ca7-4612-846e-26296fe227dc",
+      "name": "REALLY SUSPICIOUS?"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "reading file": {
+      "main": [
+        [
+          {
+            "node": "Interpretate rules",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send to AI": {
+      "main": [
+        [
+          {
+            "node": "AI response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "reading file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Interpretate rules": {
+      "main": [
+        [
+          {
+            "node": "is suspicious?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "is suspicious?": {
+      "main": [
+        [
+          {
+            "node": "REALLY SUSPICIOUS?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No problems",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ping AI": {
+      "main": [
+        [
+          {
+            "node": "model online",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "model online": {
+      "main": [
+        [
+          {
+            "node": "send to AI",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Non AI response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "REALLY SUSPICIOUS?": {
+      "main": [
+        [
+          {
+            "node": "Ping AI",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Non AI response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "9017db6c-9e8c-44e4-b00f-d6792dd7ce62",
+  "meta": {
+    "instanceId": "da5fd7c43b64d5c42419ff9156b7aa90dc249e03ef9a8ab552cd7ddaee8c1432"
+  },
+  "nodeGroups": [],
+  "id": "ZO2Yi89nAhGumV2O",
+  "tags": []
+}
