@@ -1,8 +1,8 @@
 # YALTA — Yet Another Log Troubleshooting Analyzer
 
-> **EN:** AI-powered local log analyzer for Windows, Linux, and macOS. Fast threat detection with pattern matching and deep LLM analysis for SSH, Nginx, Journalctl, Syslog, and Minecraft server logs.
+> **EN:** AI-powered local log analyzer for Windows, Linux, and macOS. Fast threat detection with pattern matching and deep LLM analysis for SSH, Nginx, Journalctl, Syslog, Postfix and Minecraft server logs.
 >
-> **RU:** Локальный ИИ-анализатор логов для Windows, Linux и macOS. Быстрое выявление угроз по правилам и глубокий анализ через LLM для SSH, Nginx, Journalctl, Syslog и серверов Minecraft.
+> **RU:** Локальный ИИ-анализатор логов для Windows, Linux и macOS. Быстрое выявление угроз по правилам и глубокий анализ через LLM для SSH, Nginx, Journalctl, Syslog, Postfix и серверов Minecraft.
 
 ---
 
@@ -37,7 +37,7 @@
 - [ ] **Incremental Log Reading** — Parsing only new log lines since the last scan.
 - [ ] **New Log Sources** — Out-of-the-box rules for Docker, Fail2ban, and PostgreSQL.
 - [ ] **n8n Web UI Form** — Simple web upload interface for non-CLI users.
-
+- [ ] **Python Edition**
 ---
 
 ## License
