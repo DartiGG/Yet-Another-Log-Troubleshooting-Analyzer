@@ -1,55 +1,87 @@
 {
-  "ssh": [
-    "Failed password for",
-    "Invalid user|Did not receive identification string",
-    "Accepted publickey for",
-    "Accepted password for",
-    "Failed publickey for",
-    "Possible Identification Changed",
-    "POSSIBLE BREAK-IN ATTEMPT!",
-    "Host key mismatch"
-  ],
-  "nginx": [
-    "(POST|GET) /(wp-admin|wp-login|admin|login|phpmyadmin) HTTP/.*\" (401|403)",
-    "GET /.*(\\.env|\\.git|\\.config|wp-config\\.php|phpinfo\\.php|storage/logs)",
-    "(\\.\\./|union.*select|<script>|exec\\(|/etc/passwd)",
-    "(sqlmap|nikto|nmap|masscan|zgrab|python-requests|gobuster|dirbuster)",
-    "(GET|POST|HEAD) / HTTP/1\\.[01]\" (508)",
-    "(X-Forwarded-For:\\s*127\\.0\\.0\\.1|Host:\\s*localhost)",
-    "(PUT|DELETE|CONNECT|TRACE|TRACK|OPTIONS)",
-    "(curl/|python-|perl|ruby|go-http-client)"
-  ],
-  "journalctl": [
-    "pam_unix\\(.*:auth\\): authentication failure",
-    "sudo:.*(3 incorrect password attempts|authentication failure)",
-    "\\b(useradd|usermod|userdel|groupadd|passwd)\\b",
-    "kernel:.*(segfault at|general protection fault)",
-    "systemd-coredump.*dumped core",
-    "Out of memory: Kill process",
-    "audit:.*type=1400.*denied",
-    "systemd\\[1\\]: Failed to start"
-  ]
-   "minecraft": [
-    "\\$\\{jndi:",
-    "Can't keep up! Is the server overloaded\\?",
-    "com\\.mojang\\.authlib\\.exceptions",
-    "Lost connection: Internal Exception",
-    "DecoderException",
-    "Invalid payload",
-    "Out of order chat packet",
-    "moved too quickly!",
-    "Disconnecting .* Too many packets"
-  ]
-"syslog": [
-  "Out of memory: Kill process",
-  "segfault at",
-  "Hardware Error",
-  "kernel: .*(CRITICAL|EMERG|ALERT)",
-  "I/O error",
-  "Buffer I/O error",
-  "eth[0-9]: link down",
-  "systemd\\[1\\]: Failed to start",
-  "sudo: .* : TTY=.* ; COMMAND="
-]
-
+  "ssh": {
+    "level_1": [
+      "^Failed password for invalid user",
+      ".*failed.*auth.*",
+      "Failed password for",
+      "Invalid user"
+    ],
+    "level_2": [
+      "source ip=(192\\.168\\.\\d{1,3}\\.\\d{1,3})",
+      "root login denied",
+      ".*privilege elevation.*"
+    ]
+  },
+  "journalctl": {
+    "level_1": [
+      "error",
+      "failed",
+      "warning",
+      "critical",
+      "denied"
+    ],
+    "level_2": [
+      "kernel:.*out of memory",
+      "segfault",
+      "authentication failure"
+    ]
+  },
+  "postfix": {
+    "level_1": [
+      "status=deferred",
+      "status=bounced",
+      "reject:"
+    ],
+    "level_2": [
+      "sasl_method=PLAIN",
+      "550 5.1.1 User unknown",
+      "relay access denied"
+    ]
+  },
+  "minecraft": {
+    "level_1": [
+      "\\[WARN\\]",
+      "Can't keep up!",
+      "lost connection",
+      "\\[Server thread/WARN\\]",
+      "moved too quickly"
+    ],
+    "level_2": [
+      "\\[SEVERE\\]",
+      "Encountered an unexpected exception",
+      "failed to verify username",
+      "Exception in server tick loop",
+      "Crash report saved to"
+    ]
+  },
+  "syslog": {
+    "level_1": [
+      "error",
+      "warning",
+      "failed",
+      "denied",
+      "timeout"
+    ],
+    "level_2": [
+      "kernel: .*out of memory",
+      "kernel panic",
+      "segfault",
+      "authentication failure",
+      "root login"
+    ]
+  },
+  "nginx": {
+    "level_1": [
+      "\" 4\\d{2} ",
+      "client sent invalid",
+      "upstream timed out",
+      "client intended to send too large body"
+    ],
+    "level_2": [
+      "\" 5\\d{2} ",
+      "SSL_do_handshake\\(\\) failed",
+      "no live upstreams",
+      "connect\\(\\) failed \\(.*\\) while connecting to upstream"
+    ]
+  }
 }
